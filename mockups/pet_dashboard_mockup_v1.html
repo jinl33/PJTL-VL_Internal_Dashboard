@@ -1,0 +1,525 @@
+<title>PET Estimation Dashboard</title>
+<style>
+/* DESIGN MOCK-UP. Every image and number on this page is synthetic.
+   Layout: brand bar -> mock banner -> one filter row -> stat tiles -> 4 image panels with SVG
+   overlays -> hotspot + cluster detail -> cohort chart + full table -> methods. */
+:root {
+  --bg: #f3f5f8; --surface: #ffffff; --surface-2: #eaeef3; --ink: #172030; --muted: #66717f; --line: #dde3ea;
+  --brand: #1f3a5f; --brand-ink: #1f3a5f; --accent: #f2c244;
+  --s1: #2a78d6; --s2: #eb6834;
+  --good: #0ca30c; --good-text: #006300; --bad: #d03b3b; --bad-text: #a52a2a;
+  --gt: #7CFC00; --cmp: #ff3b6b;
+  --font: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e131a; --surface: #161d26; --surface-2: #1f2834; --ink: #eef2f6; --muted: #9aa6b4;
+    --line: #28323e; --brand: #182f4e; --brand-ink: #9dbbe3; --s1: #3987e5; --s2: #d95926;
+    --good-text: #3fcf3f; --bad-text: #ef6b6b; color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e131a; --surface: #161d26; --surface-2: #1f2834; --ink: #eef2f6; --muted: #9aa6b4;
+  --line: #28323e; --brand: #182f4e; --brand-ink: #9dbbe3; --s1: #3987e5; --s2: #d95926;
+  --good-text: #3fcf3f; --bad-text: #ef6b6b; color-scheme: dark;
+}
+* { box-sizing: border-box; }
+body { background: var(--bg); color: var(--ink); font-family: var(--font); font-size: 14px; line-height: 1.45; margin: 0; }
+.wrap { max-width: 1280px; margin: 0 auto; padding-inline: 16px; padding-block: 0 48px; display: grid; gap: 20px; }
+h1, h2, h3 { margin: 0; text-wrap: balance; }
+h2 { font-size: 15px; font-weight: 600; }
+h3 { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+p { margin: 0; }
+button { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.bar { background: var(--brand); color: #fff; padding: 14px 16px; }
+.bar-inner { max-width: 1248px; margin: 0 auto; display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 18px; }
+.bar h1 { font-size: 18px; font-weight: 600; }
+.bar .sub { font-size: 13px; opacity: .85; }
+.bar .tag { margin-left: auto; font-size: 12px; opacity: .8; }
+.mock { background: var(--accent); color: #172030; font-size: 13px; font-weight: 600; text-align: center; padding: 6px 16px; margin-bottom: 20px; }
+.filters { display: flex; flex-wrap: wrap; gap: 10px 22px; align-items: center; padding: 12px 14px; background: var(--surface); border: 1px solid var(--line); border-radius: 10px; }
+.filter { display: flex; align-items: center; gap: 8px; }
+.filter > label, .filter > span.lbl { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
+.seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { background: var(--surface); border: 0; padding: 6px 12px; cursor: pointer; border-right: 1px solid var(--line); }
+.seg button:last-child { border-right: 0; }
+.seg button[aria-pressed="true"] { background: var(--accent); color: #172030; font-weight: 600; }
+.check { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; }
+.check input { accent-color: var(--brand-ink); width: 15px; height: 15px; margin: 0; }
+select { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 6px 8px; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; }
+.tile { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; display: grid; gap: 4px; }
+.tile .lbl { font-size: 12px; color: var(--muted); }
+.tile .val { font-size: 28px; font-weight: 600; line-height: 1.1; }
+.tile .val small { font-size: 13px; font-weight: 400; color: var(--muted); margin-left: 4px; }
+.tile .base { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.pill { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 600; padding: 1px 7px; border-radius: 999px; border: 1px solid currentColor; }
+.pill.good { color: var(--good-text); } .pill.bad { color: var(--bad-text); } .pill.even { color: var(--muted); }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 14px; display: grid; gap: 12px; min-width: 0; }
+.panel-head { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 16px; }
+.panel-head .meta { font-size: 12px; color: var(--muted); }
+.imgs { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+.fig { display: grid; gap: 6px; min-width: 0; margin: 0; }
+.fig .title { font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.fig .title .sw { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+.fig .cap { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.stage { position: relative; aspect-ratio: 1 / 1; max-width: 100%; border-radius: 6px; overflow: hidden; background: #161b22; }
+.stage img { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.stage svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.stage svg * { vector-effect: non-scaling-stroke; }
+.legend-ov { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 12px; color: var(--muted); align-items: center; }
+.legend-ov .k { display: inline-flex; align-items: center; gap: 5px; }
+.legend-ov svg { width: 16px; height: 16px; }
+.cbar { display: grid; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; font-size: 11px; color: var(--muted); }
+.cbar .ramp { height: 8px; border-radius: 4px; }
+.two { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; }
+.tbl-wrap { overflow-x: auto; }
+table { border-collapse: collapse; width: 100%; font-size: 13px; }
+th, td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--line); white-space: nowrap; font-variant-numeric: tabular-nums; }
+th { font-weight: 600; color: var(--muted); font-size: 12px; }
+th:first-child, td:first-child { text-align: left; }
+tr.grp td { background: var(--surface-2); font-weight: 600; color: var(--muted); font-size: 12px; text-transform: uppercase; letter-spacing: .04em; }
+td.win { font-weight: 600; }
+td .dot, th .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; vertical-align: middle; }
+.note { font-size: 12px; color: var(--muted); }
+.chart-head { display: flex; flex-wrap: wrap; gap: 8px 16px; align-items: center; justify-content: space-between; }
+.legend { display: flex; gap: 14px; font-size: 12px; color: var(--muted); }
+.legend .k { display: inline-flex; align-items: center; gap: 6px; }
+.legend .sw { width: 12px; height: 12px; border-radius: 3px; }
+.chart { position: relative; width: 100%; }
+.chart svg { width: 100%; height: auto; display: block; }
+.chart text { fill: var(--muted); font-family: var(--font); font-size: 11px; }
+.chart .grid, .chart .axis { stroke: var(--line); stroke-width: 1; }
+.chart .lab { fill: var(--ink); font-size: 11px; }
+.chart .bar { transition: opacity .15s; cursor: default; }
+.tip { position: absolute; pointer-events: none; background: var(--ink); color: var(--bg); font-size: 12px; padding: 6px 8px; border-radius: 6px; white-space: nowrap; transform: translate(-50%, -110%); }
+details { border-top: 1px solid var(--line); padding: 10px 0; }
+details summary { cursor: pointer; font-weight: 600; }
+details p { margin-top: 6px; max-width: 70ch; }
+details .why { color: var(--muted); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+@media (max-width: 520px) { .tile .val { font-size: 24px; } .bar .tag { margin-left: 0; } }
+</style>
+
+<header class="bar">
+  <div class="bar-inner">
+    <h1>PET Estimation Dashboard</h1>
+    <span class="sub">ERP-generated amyloid PET vs. ground-truth PET, held-out subjects</span>
+    <span class="tag" id="meta-tag"></span>
+  </div>
+</header>
+<div class="mock">Design mock-up. Every brain image and every number on this page is synthetic placeholder content.</div>
+
+<main class="wrap" id="app">
+  <section class="filters" id="filters">
+    <div class="filter"><span class="lbl">Subject</span><div class="seg" id="seg-subj" role="group" aria-label="Subject"></div></div>
+    <div class="filter"><span class="lbl">Slice</span><div class="seg" id="seg-slice" role="group" aria-label="Slice"></div></div>
+    <div class="filter"><span class="lbl">Overlays</span>
+      <label class="check"><input type="checkbox" id="ov-hot" checked> Hotspots</label>
+      <label class="check"><input type="checkbox" id="ov-clu"> Clusters</label>
+      <label class="check"><input type="checkbox" id="ov-reg"> Regions</label>
+    </div>
+    <div class="filter"><label for="diff-sel">Difference</label>
+      <select id="diff-sel"><option value="pred">Prediction − GT</option><option value="med">Median − GT</option></select>
+    </div>
+  </section>
+
+  <section class="tiles" id="tiles"></section>
+
+  <section class="panel" id="images">
+    <div class="panel-head"><h2 id="img-title"></h2><span class="meta" id="img-meta"></span></div>
+    <div class="imgs" id="imgs"></div>
+    <div class="cbar"><span>0</span><div class="ramp" id="ramp-int"></div><span id="ramp-max"></span></div>
+    <div class="legend-ov" id="legend-ov"></div>
+  </section>
+
+  <section class="two" id="detail">
+    <div class="panel">
+      <div class="panel-head"><h2>Hotspots, this slice</h2><span class="meta">R1–R4, top-K peaks, greedy 1-to-1 matching</span></div>
+      <div class="tbl-wrap" id="hot-table"></div>
+      <p class="note">TRE is the mean distance between a GT peak and its matched peak, in pixels. “Hits ≤10 px” counts matched peaks within 10 px.</p>
+    </div>
+    <div class="panel">
+      <div class="panel-head"><h2>Clusters, this slice</h2><span class="meta" id="clu-meta"></span></div>
+      <div class="tbl-wrap" id="clu-table"></div>
+      <p class="note">Clusters are watershed segments of the area above the shared amyloid threshold. Match rate: GT clusters with a 1-to-1 partner. FPR: predicted clusters with no GT partner.</p>
+    </div>
+  </section>
+
+  <section class="panel" id="cohort">
+    <div class="chart-head">
+      <div class="filter"><label for="metric-sel">Across subjects</label><select id="metric-sel"></select></div>
+      <div class="legend"><span class="k"><span class="sw" style="background:var(--s1)"></span>ERP prediction</span><span class="k"><span class="sw" style="background:var(--s2)"></span>Median baseline</span></div>
+    </div>
+    <p class="note" id="metric-note"></p>
+    <div class="chart" id="chart"><div class="tip" id="tip" hidden></div></div>
+    <h3>All measures, volume level (mean over slices)</h3>
+    <div class="tbl-wrap" id="full-table"></div>
+  </section>
+
+  <section class="panel" id="methods">
+    <h2>How to read these measures</h2>
+    <details><summary>What is being compared</summary>
+      <p>For each held-out subject the pipeline predicts the PET slices from that subject’s ERP features alone; the subject’s real PET was never seen in training. Every measure is computed twice against the same ground truth: once for the ERP prediction and once for the <strong>median baseline</strong>, the pixel-wise median of the training PET scans. The baseline is the number to beat: a model that only reproduces the population average scores like the median.</p>
+      <p class="why">All measures are restricted to the brain mask. GT, prediction and median share one intensity scale per subject, so brighter in one image means brighter in the data.</p></details>
+    <details><summary>SSIM family (iSSIM, gSSIM, cSSIM, 3D SSIM)</summary>
+      <p>Structural similarity compares local means, contrasts and structure in sliding windows. iSSIM works on intensities, gSSIM on gradient magnitudes (edges), and cSSIM is the pipeline’s combined score. 3D SSIM treats the slice stack as a volume so cross-slice consistency counts. Range −1 to 1, higher is better.</p>
+      <p class="why">Why: SSIM is the team’s historical headline number, but it rewards smooth, average-looking images. That is why it is paired with the measures below.</p></details>
+    <details><summary>Dice, Jaccard and MAE</summary>
+      <p>Pixels above the shared amyloid threshold form the amyloid-positive area. Dice and Jaccard measure the overlap of that area between prediction and GT (0–1, higher is better). MAE is the mean absolute intensity error inside the brain (lower is better).</p></details>
+    <details><summary>Sliced Wasserstein distance</summary>
+      <p>An optimal-transport distance between the two images seen as point clouds of (row, column, intensity). It penalises intensity that is in the wrong place, which pixel-wise errors and SSIM only partly capture. Lower is better.</p></details>
+    <details><summary>Hotspot measures (TRE, HDR, intensity error)</summary>
+      <p>Within each anatomical region R1–R4 the K brightest, well-separated peaks are found in GT, prediction and median. Peaks are matched 1-to-1, closest pair first. TRE is the mean matched distance in pixels (lower is better); HDR@d is the share of GT peaks matched within d pixels (higher is better); intensity error is the relative error at matched peaks (lower is better).</p>
+      <p class="why">Why: clinicians look for where uptake is highest. A prediction can have a good SSIM and still put its peaks in the wrong gyrus.</p></details>
+    <details><summary>Cluster measures (match rate, FPR, centroid distance, IoU)</summary>
+      <p>The amyloid-positive area is split into clusters by a watershed on the smoothed image. GT and predicted clusters are matched 1-to-1 by centroid distance; a pair must overlap or lie within 12 px. Match rate is the share of GT clusters with a partner (higher is better), FPR the share of predicted clusters with no partner (lower is better). Mean centroid distance and mean IoU describe how well matched pairs line up.</p>
+      <p class="why">Why: a region-level view between pixel SSIM and single-peak hotspots. It asks whether the prediction finds the same patches of uptake, not whether every pixel agrees.</p></details>
+    <details><summary>Data provenance</summary><p id="prov"></p></details>
+  </section>
+</main>
+
+<script>
+/* =====================================================================
+   SYNTHETIC DATA. Brain slices are drawn procedurally; peaks and clusters are
+   the planted blobs; SSIM-type numbers are random draws around plausible values.
+   ===================================================================== */
+function mulberry32(a){ return function(){ a |= 0; a = a + 0x6D2B79F5 | 0; let t = Math.imul(a ^ a >>> 15, 1 | a); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const rnd = mulberry32(20261001);
+const gauss = () => { let u = 0, v = 0; while (!u) u = rnd(); while (!v) v = rnd(); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+const N = 128, CX = 64, CY = 66, RX = 46, RY = 56;
+const JET = (() => { const stops = [[0,0,127],[0,0,255],[0,255,255],[127,255,127],[255,255,0],[255,0,0],[127,0,0]]; return t => { t = Math.max(0, Math.min(1, t)) * (stops.length - 1); const i = Math.min(stops.length - 2, Math.floor(t)), f = t - i; return stops[i].map((c, k) => Math.round(c + (stops[i + 1][k] - c) * f)); }; })();
+const RDBU = t => { t = Math.max(-1, Math.min(1, t)); const g = [240, 239, 236]; const r = [178, 24, 43], b = [33, 102, 172]; const a = Math.abs(t); const to = t > 0 ? r : b; return g.map((c, k) => Math.round(c + (to[k] - c) * a)); };
+
+function rNorm(x, y){ return Math.hypot((x - CX) / RX, (y - CY) / RY); }
+function angleOf(x, y){ return Math.atan2(y - CY, x - CX); }
+function regionOf(x, y, s){
+  const r = rNorm(x, y); if (r > 1) return 0;
+  if (r < 0.45) return 5;
+  const a = angleOf(x, y) * 180 / Math.PI;
+  if (a > -135 && a <= -45) return 1;
+  if (a > 45 && a <= 135) return 4;
+  return x < CX ? 2 : 3;
+}
+function ventricle(x, y, s){ const dx = Math.abs(x - CX), dy = y - CY + 4; const vy = 13 + 4 * s; return ((dx - 7) / 6) ** 2 + (dy / vy) ** 2 <= 1 || (dx < 3 && Math.abs(dy) < 7); }
+const smooth = (e0, e1, x) => { const t = Math.max(0, Math.min(1, (x - e0) / (e1 - e0))); return t * t * (3 - 2 * t); };
+
+function baseIntensity(x, y, s, load, soft){
+  const r = rNorm(x, y); if (r > 1.02) return 0;
+  if (ventricle(x, y, s)) return 0.05;
+  const a = angleOf(x, y);
+  const ribbon = smooth(0.72 - soft, 0.82, r) * (1 - smooth(0.95, 1.0 + soft, r));
+  const tex = 0.06 * Math.sin(a * 9 + s) * Math.cos(r * 40);
+  const wm = 0.36, deep = r < 0.45 ? 0.5 : wm;
+  return deep * (1 - ribbon) + (0.62 * load + tex) * ribbon;
+}
+function blobField(x, y, blobs){ let v = 0; for (const b of blobs){ const d2 = (x - b.x) ** 2 + (y - b.y) ** 2; v += b.amp * Math.exp(-d2 / (2 * b.sig * b.sig)); } return v; }
+
+function makeBlobs(n, s, ampLo, ampHi, sigLo, sigHi){
+  const out = [];
+  for (let i = 0; i < n; i++){
+    const ang = (i / n) * 2 * Math.PI + (rnd() - 0.5) * 0.5 + s * 0.3;
+    const r = 0.84 + (rnd() - 0.5) * 0.08;
+    out.push({ x: CX + Math.cos(ang) * RX * r, y: CY + Math.sin(ang) * RY * r, amp: ampLo + rnd() * (ampHi - ampLo), sig: sigLo + rnd() * (sigHi - sigLo) });
+  }
+  return out;
+}
+
+function renderField(fn, bm, mode){
+  const c = document.createElement('canvas'); c.width = N; c.height = N; const ctx = c.getContext('2d');
+  const im = ctx.createImageData(N, N);
+  for (let y = 0; y < N; y++) for (let x = 0; x < N; x++){
+    const i = (y * N + x) * 4; let rgb;
+    if (!bm(x, y)) rgb = [22, 27, 34]; else rgb = mode === 'div' ? RDBU(fn(x, y)) : JET(fn(x, y));
+    im.data[i] = rgb[0]; im.data[i + 1] = rgb[1]; im.data[i + 2] = rgb[2]; im.data[i + 3] = 255;
+  }
+  ctx.putImageData(im, 0, 0);
+  const big = document.createElement('canvas'); big.width = N * 3; big.height = N * 3; const bctx = big.getContext('2d');
+  bctx.imageSmoothingEnabled = false; bctx.drawImage(c, 0, 0, N * 3, N * 3);
+  return big.toDataURL('image/png');
+}
+
+function circlePoly(y, x, r, n = 28){ const p = []; for (let i = 0; i < n; i++){ const a = i / n * 2 * Math.PI; p.push([+(y + Math.sin(a) * r).toFixed(2), +(x + Math.cos(a) * r).toFixed(2)]); } return p; }
+function ellipsePts(scale, a0, a1, n = 24){ const p = []; for (let i = 0; i <= n; i++){ const a = a0 + (a1 - a0) * i / n; p.push([+(CY + Math.sin(a) * RY * scale).toFixed(2), +(CX + Math.cos(a) * RX * scale).toFixed(2)]); } return p; }
+function sectorPoly(a0, a1){ return ellipsePts(1, a0, a1).concat(ellipsePts(0.45, a1, a0)); }
+const D = Math.PI / 180;
+const REGION_GEO = { '1': [sectorPoly(-135 * D, -45 * D)], '2': [sectorPoly(135 * D, 225 * D)], '3': [sectorPoly(-45 * D, 45 * D)], '4': [sectorPoly(45 * D, 135 * D)], '5': [ellipsePts(0.45, 0, 2 * Math.PI, 40)] };
+const REGION_NAMES = { 1: 'R1 Frontal', 2: 'R2 L-Temporal', 3: 'R3 R-Temporal', 4: 'R4 Occipital', 5: 'R5 Deep/Other' };
+
+function greedy(gt, other){
+  const pairs = []; const uo = new Set(), ug = new Set();
+  for (let n = 0; n < Math.min(gt.length, other.length); n++){
+    let best = null;
+    other.forEach((o, j) => { if (uo.has(j)) return; gt.forEach((g, i) => { if (ug.has(i)) return; const d = Math.hypot(o.y - g.y, o.x - g.x); if (!best || d < best[2]) best = [j, i, d]; }); });
+    if (!best) break; pairs.push(best); uo.add(best[0]); ug.add(best[1]);
+  }
+  return pairs;
+}
+const sum = a => a.reduce((x, y) => x + y, 0);
+const mean = a => a.length ? sum(a) / a.length : null;
+
+function hotspotSummary(regions, who){
+  const dists = [], ierr = []; let nGt = 0; const hits = { 5: 0, 10: 0, 15: 0 };
+  regions.forEach(r => { nGt += r.gt.length; r['pairs_' + who].forEach(([oi, gi, d]) => { dists.push(d); const g = r.gt[gi].v; ierr.push(Math.abs(r[who][oi].v - g) / g); [5, 10, 15].forEach(t => { if (d <= t) hits[t]++; }); }); });
+  return { n_gt_peaks: nGt, tre: mean(dists), int_err: mean(ierr), hdr5: nGt ? 100 * hits[5] / nGt : null, hdr10: nGt ? 100 * hits[10] / nGt : null, hdr15: nGt ? 100 * hits[15] / nGt : null };
+}
+function clusterSummary(nGt, nO, pairs){ const m = pairs.length; return { n_gt: nGt, n_pred: nO, matched: m, match_rate: nGt ? 100 * m / nGt : null, fpr: nO ? 100 * (nO - m) / nO : null, mean_dist: mean(pairs.map(p => p[2])), mean_iou: mean(pairs.map(p => p[3])) }; }
+
+function buildSubject(id, suvr, load, quality){
+  // quality in [0,1]: how close the mock prediction is to GT (drives shifts + random metrics)
+  const vmax = 22000 + Math.round(rnd() * 6000), dmax = Math.round(vmax * 0.35);
+  const slices = [];
+  for (let s = 0; s < 3; s++){
+    const bm = (x, y) => rNorm(x, y) <= 1.02;
+    const gtBlobs = makeBlobs(9, s, 0.22, 0.42, 4, 6);
+    const prBlobs = gtBlobs.slice(0, 8).map(b => ({ x: b.x + gauss() * (6 - 4 * quality), y: b.y + gauss() * (6 - 4 * quality), amp: b.amp * (0.7 + rnd() * 0.5), sig: b.sig + 1 }));
+    prBlobs.push(...makeBlobs(1, s + 7, 0.25, 0.35, 5, 6));
+    const mdBlobs = makeBlobs(6, 0, 0.12, 0.18, 7, 8).map(b => ({ ...b, x: CX + (b.x - CX), y: CY + (b.y - CY) }));
+    const gtF = (x, y) => baseIntensity(x, y, s, load, 0) + blobField(x, y, gtBlobs);
+    const prF = (x, y) => baseIntensity(x, y, s, load * 0.92, 0.05) + blobField(x, y, prBlobs) + 0.03 * Math.sin(x / 5) * Math.cos(y / 7);
+    const mdF = (x, y) => baseIntensity(x, y, s, 0.9, 0.08) + blobField(x, y, mdBlobs);
+    const img = {
+      gt: renderField(gtF, bm), pred: renderField(prF, bm), med: renderField(mdF, bm),
+      diff_pred: renderField((x, y) => (prF(x, y) - gtF(x, y)) / 0.35, bm, 'div'),
+      diff_med: renderField((x, y) => (mdF(x, y) - gtF(x, y)) / 0.35, bm, 'div'),
+    };
+    const toPeak = b => ({ y: +b.y.toFixed(1), x: +b.x.toFixed(1), v: Math.round(gtF(b.x, b.y) * vmax * 0.9) });
+    const regions = [1, 2, 3, 4].map(r => {
+      const k = r === 1 || r === 4 ? 3 : 2;
+      const inR = b => regionOf(b.x, b.y, s) === r;
+      const gt = gtBlobs.filter(inR).sort((a, b) => b.amp - a.amp).slice(0, k).map(toPeak);
+      const pred = prBlobs.filter(inR).sort((a, b) => b.amp - a.amp).slice(0, k).map(toPeak);
+      const med = mdBlobs.filter(inR).slice(0, k).map(toPeak);
+      const pp = greedy(gt, pred), pm = greedy(gt, med);
+      return { r, name: REGION_NAMES[r], k, gt, pred, med, pairs_pred: pp, pairs_med: pm, tre_pred: mean(pp.map(p => p[2])), tre_med: mean(pm.map(p => p[2])) };
+    }).filter(r => r.gt.length);
+    const toCl = (b, i) => ({ id: i + 1, y: +b.y.toFixed(1), x: +b.x.toFixed(1), area: Math.round(Math.PI * (b.sig * 1.6) ** 2), contour: [circlePoly(b.y, b.x, b.sig * 1.6)] });
+    const cg = gtBlobs.map(toCl), cp = prBlobs.map(toCl), cm = mdBlobs.map(toCl);
+    const withIou = pairs => pairs.filter(p => p[2] <= 12).map(p => [p[0], p[1], p[2], Math.max(0, 0.85 - p[2] / 14)]);
+    const cpp = withIou(greedy(cg, cp)), cpm = withIou(greedy(cg, cm));
+    const cl = { gt: cg, pred: cp, med: cm, pairs_pred: cpp, pairs_med: cpm, summary: { pred: clusterSummary(cg.length, cp.length, cpp), med: clusterSummary(cg.length, cm.length, cpm) } };
+    const cs = 0.60 + 0.08 * (quality - 0.5) + gauss() * 0.02, cm2 = 0.63 + gauss() * 0.015;
+    slices.push({
+      idx: s, img, hotspot: { regions, pred: hotspotSummary(regions, 'pred'), med: hotspotSummary(regions, 'med') }, cluster: cl,
+      ssim: { cSSIM_pred: cs, cSSIM_med: cm2, gSSIM_pred: cs + 0.01, gSSIM_med: cm2 - 0.005, iSSIM_pred: cs - 0.015, iSSIM_med: cm2 + 0.01 },
+      dice: { pred: 0.42 + 0.1 * quality + gauss() * 0.02, med: 0.48 + gauss() * 0.02 },
+      jaccard: { pred: 0.27 + 0.08 * quality + gauss() * 0.02, med: 0.32 + gauss() * 0.02 },
+      swd: { pred: 0.055 - 0.01 * quality + gauss() * 0.002, med: 0.058 + gauss() * 0.002 },
+      mae: { pred: Math.round(vmax * (0.13 - 0.03 * quality)), med: Math.round(vmax * 0.12) },
+    });
+  }
+  const vol = { ssim: {}, ssim3d: { pred: 0.30 + 0.1 * quality, med: 0.50 } };
+  ['iSSIM', 'gSSIM', 'cSSIM'].forEach(k => ['pred', 'med'].forEach(w => vol.ssim[`${k}_${w}`] = mean(slices.map(sl => sl.ssim[`${k}_${w}`]))));
+  ['dice', 'jaccard', 'swd', 'mae'].forEach(k => vol[k] = { pred: mean(slices.map(sl => sl[k].pred)), med: mean(slices.map(sl => sl[k].med)) });
+  vol.hotspot = { pred: hotspotSummary(slices.flatMap(sl => sl.hotspot.regions), 'pred'), med: hotspotSummary(slices.flatMap(sl => sl.hotspot.regions), 'med') };
+  vol.cluster = {}; ['pred', 'med'].forEach(w => vol.cluster[w] = clusterSummary(sum(slices.map(sl => sl.cluster.gt.length)), sum(slices.map(sl => sl.cluster[w].length)), slices.flatMap(sl => sl.cluster['pairs_' + w])));
+  return { id, suvr, vmax, dmax, slices, volume: vol };
+}
+
+function cohort(subs){
+  const out = { n: subs.length };
+  const pair = f => ({ pred: mean(subs.map(s => f(s.volume)[0])), med: mean(subs.map(s => f(s.volume)[1])) });
+  out.ssim3d = pair(v => [v.ssim3d.pred, v.ssim3d.med]);
+  ['dice', 'jaccard', 'swd', 'mae'].forEach(k => out[k] = pair(v => [v[k].pred, v[k].med]));
+  ['iSSIM', 'gSSIM', 'cSSIM'].forEach(k => out[k] = pair(v => [v.ssim[k + '_pred'], v.ssim[k + '_med']]));
+  ['tre', 'hdr5', 'hdr10', 'hdr15', 'int_err'].forEach(k => out['hot_' + k] = pair(v => [v.hotspot.pred[k], v.hotspot.med[k]]));
+  ['match_rate', 'fpr', 'mean_dist', 'mean_iou'].forEach(k => out['clu_' + k] = pair(v => [v.cluster.pred[k], v.cluster.med[k]]));
+  return out;
+}
+
+function buildMockData(){
+  const subjects = [buildSubject('SUBJ-A', 1.43, 1.15, 0.65), buildSubject('SUBJ-B', 1.08, 0.95, 0.35), buildSubject('SUBJ-C', 1.27, 1.05, 0.5)];
+  const test = cohort(subjects);
+  // training cohort: a model that fits what it has seen scores far above the median there
+  const train = JSON.parse(JSON.stringify(test)); train.n = 28;
+  Object.keys(train).forEach(k => { if (k === 'n') return; const t = train[k]; if (!t || t.pred == null) return; const higher = !/swd|mae|tre|int_err|fpr|mean_dist/.test(k); t.pred = higher ? t.med + Math.abs(t.med) * 0.3 : t.med * 0.6; if (/hdr|match_rate/.test(k)) t.pred = Math.min(100, t.pred); if (/ssim|dice|jaccard|iou/i.test(k) && !/3d/.test(k)) t.pred = Math.min(0.98, t.pred); });
+  return {
+    meta: { built: '2026-10-01 (mock)', fold_label: 'Held-out test: SUBJ-A, SUBJ-B, SUBJ-C', n_train: 28, n_test: 3, n_slices: 3, threshold: 14250 },
+    slices: [0, 1, 2].map(s => ({ idx: s, regions: REGION_GEO })),
+    subjects, cohort: { test, train },
+  };
+}
+const DATA = buildMockData();
+
+/* ===================================================================== dashboard */
+const METRICS = [
+  { key:'cSSIM', group:'SSIM', label:'cSSIM (combined)', higher:true, digits:3, cohort:'cSSIM', vol:v=>[v.ssim.cSSIM_pred, v.ssim.cSSIM_med], note:'Combined gradient + intensity SSIM used by the pipeline. Higher is better.' },
+  { key:'gSSIM', group:'SSIM', label:'gSSIM (gradient)', higher:true, digits:3, cohort:'gSSIM', vol:v=>[v.ssim.gSSIM_pred, v.ssim.gSSIM_med], note:'SSIM on gradient magnitudes: edges and boundaries. Higher is better.' },
+  { key:'iSSIM', group:'SSIM', label:'iSSIM (intensity)', higher:true, digits:3, cohort:'iSSIM', vol:v=>[v.ssim.iSSIM_pred, v.ssim.iSSIM_med], note:'SSIM on raw intensities. Higher is better.' },
+  { key:'ssim3d', group:'SSIM', label:'3D SSIM', higher:true, digits:3, cohort:'ssim3d', vol:v=>[v.ssim3d.pred, v.ssim3d.med], note:'SSIM over the slice stack as a volume. Higher is better.' },
+  { key:'dice', group:'Overlap', label:'Dice (amyloid area)', higher:true, digits:3, cohort:'dice', vol:v=>[v.dice.pred, v.dice.med], note:'Overlap of the above-threshold area with GT. Higher is better.' },
+  { key:'jaccard', group:'Overlap', label:'Jaccard (amyloid area)', higher:true, digits:3, cohort:'jaccard', vol:v=>[v.jaccard.pred, v.jaccard.med], note:'Intersection over union of the above-threshold area. Higher is better.' },
+  { key:'mae', group:'Overlap', label:'MAE (brain)', higher:false, digits:0, cohort:'mae', vol:v=>[v.mae.pred, v.mae.med], note:'Mean absolute intensity error inside the brain mask. Lower is better.' },
+  { key:'swd', group:'Overlap', label:'Sliced Wasserstein', higher:false, digits:4, cohort:'swd', vol:v=>[v.swd.pred, v.swd.med], note:'Optimal-transport distance of (row, col, intensity) point clouds. Lower is better.' },
+  { key:'hot_tre', group:'Hotspot', label:'Hotspot TRE (px)', higher:false, digits:1, cohort:'hot_tre', vol:v=>[v.hotspot.pred.tre, v.hotspot.med.tre], note:'Mean distance from each GT peak to its matched peak. Lower is better.' },
+  { key:'hot_hdr10', group:'Hotspot', label:'Hotspot HDR @10 px (%)', higher:true, digits:0, cohort:'hot_hdr10', vol:v=>[v.hotspot.pred.hdr10, v.hotspot.med.hdr10], note:'Share of GT peaks matched within 10 px. Higher is better.' },
+  { key:'hot_hdr5', group:'Hotspot', label:'Hotspot HDR @5 px (%)', higher:true, digits:0, cohort:'hot_hdr5', vol:v=>[v.hotspot.pred.hdr5, v.hotspot.med.hdr5], note:'Share of GT peaks matched within 5 px. Higher is better.' },
+  { key:'hot_int', group:'Hotspot', label:'Hotspot intensity error', higher:false, digits:3, cohort:'hot_int_err', vol:v=>[v.hotspot.pred.int_err, v.hotspot.med.int_err], note:'Relative intensity error at matched peaks. Lower is better.' },
+  { key:'clu_match', group:'Cluster', label:'Cluster match rate (%)', higher:true, digits:0, cohort:'clu_match_rate', vol:v=>[v.cluster.pred.match_rate, v.cluster.med.match_rate], note:'GT clusters with a 1-to-1 partner. Higher is better.' },
+  { key:'clu_fpr', group:'Cluster', label:'Cluster FPR (%)', higher:false, digits:0, cohort:'clu_fpr', vol:v=>[v.cluster.pred.fpr, v.cluster.med.fpr], note:'Predicted clusters with no GT partner. Lower is better.' },
+  { key:'clu_dist', group:'Cluster', label:'Cluster centroid distance (px)', higher:false, digits:1, cohort:'clu_mean_dist', vol:v=>[v.cluster.pred.mean_dist, v.cluster.med.mean_dist], note:'Mean centroid distance over matched cluster pairs. Lower is better.' },
+  { key:'clu_iou', group:'Cluster', label:'Cluster IoU (matched)', higher:true, digits:3, cohort:'clu_mean_iou', vol:v=>[v.cluster.pred.mean_iou, v.cluster.med.mean_iou], note:'Mean IoU over matched cluster pairs. Higher is better.' },
+];
+const TILE_KEYS = ['cSSIM', 'dice', 'hot_hdr10', 'clu_match'];
+
+const $ = id => document.getElementById(id);
+const fmt = (v, d = 3) => (v === null || v === undefined || Number.isNaN(v)) ? '–' : Number(v).toFixed(d);
+const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+function store(k, v){ try { localStorage.setItem('petdash.' + k, JSON.stringify(v)); } catch (e) {} }
+function load(k, d){ try { const v = localStorage.getItem('petdash.' + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } }
+const state = { subj: load('subj', 0), slice: load('slice', 1), ovHot: load('ovHot', true), ovClu: load('ovClu', false), ovReg: load('ovReg', false), diff: load('diff', 'pred'), metric: load('metric', 'cSSIM') };
+
+function verdict(pred, med, higher, tol = 0.005){
+  if (pred == null || med == null) return { cls: 'even', text: 'no baseline' };
+  const rel = Math.abs(med) > 1e-9 ? (pred - med) / Math.abs(med) : (pred - med);
+  if (Math.abs(rel) < tol) return { cls: 'even', text: '≈ baseline' };
+  const better = higher ? pred > med : pred < med; const pct = Math.abs(rel * 100);
+  return { cls: better ? 'good' : 'bad', text: (better ? '▲ beats baseline' : '▼ below baseline') + ' ' + (pct >= 10 ? pct.toFixed(0) : pct.toFixed(1)) + '%' };
+}
+
+function init(){
+  const m = DATA.meta;
+  $('meta-tag').textContent = `${m.fold_label} · ${m.n_train} train / ${m.n_test} test · ${m.n_slices} slices · built ${m.built}`;
+  $('prov').textContent = 'Mock-up. In the real build this line lists the saved_metrics files, the mask set and the amyloid threshold used.';
+  if (state.subj >= DATA.subjects.length) state.subj = 0; if (state.slice >= m.n_slices) state.slice = 0;
+  $('ov-hot').checked = state.ovHot; $('ov-clu').checked = state.ovClu; $('ov-reg').checked = state.ovReg; $('diff-sel').value = state.diff;
+  $('ov-hot').onchange = e => { state.ovHot = e.target.checked; store('ovHot', state.ovHot); renderImages(); };
+  $('ov-clu').onchange = e => { state.ovClu = e.target.checked; store('ovClu', state.ovClu); renderImages(); };
+  $('ov-reg').onchange = e => { state.ovReg = e.target.checked; store('ovReg', state.ovReg); renderImages(); };
+  $('diff-sel').onchange = e => { state.diff = e.target.value; store('diff', state.diff); renderImages(); };
+  const ms = $('metric-sel'); let grp = null, og = null;
+  METRICS.forEach(mt => { if (mt.group !== grp){ grp = mt.group; og = document.createElement('optgroup'); og.label = grp; ms.appendChild(og); } const o = document.createElement('option'); o.value = mt.key; o.textContent = mt.label; og.appendChild(o); });
+  if (!METRICS.find(x => x.key === state.metric)) state.metric = 'cSSIM';
+  ms.value = state.metric; ms.onchange = e => { state.metric = e.target.value; store('metric', state.metric); renderChart(); };
+  $('ramp-int').style.background = 'linear-gradient(90deg,#00007f,#0000ff,#00ffff,#7fff7f,#ffff00,#ff0000,#7f0000)';
+  renderSegs(); renderAll(); window.addEventListener('resize', () => renderChart());
+}
+function renderSegs(){
+  const ss = $('seg-subj'); ss.innerHTML = '';
+  DATA.subjects.forEach((s, i) => { const b = document.createElement('button'); b.type = 'button'; b.textContent = s.id; b.setAttribute('aria-pressed', i === state.subj); b.onclick = () => { state.subj = i; store('subj', i); renderSegs(); renderAll(); }; ss.appendChild(b); });
+  const sl = $('seg-slice'); sl.innerHTML = '';
+  for (let k = 0; k < DATA.meta.n_slices; k++){ const b = document.createElement('button'); b.type = 'button'; b.textContent = 'Slice ' + k; b.setAttribute('aria-pressed', k === state.slice); b.onclick = () => { state.slice = k; store('slice', k); renderSegs(); renderImages(); renderDetail(); }; sl.appendChild(b); }
+}
+function renderAll(){ renderTiles(); renderImages(); renderDetail(); renderChart(); renderFullTable(); }
+
+function renderTiles(){
+  const s = DATA.subjects[state.subj]; const v = s.volume; const el = $('tiles'); el.innerHTML = '';
+  TILE_KEYS.forEach(k => {
+    const mt = METRICS.find(x => x.key === k); const [p, m] = mt.vol(v); const vd = verdict(p, m, mt.higher); const unit = mt.label.includes('%') ? '%' : '';
+    const d = document.createElement('div'); d.className = 'tile';
+    d.innerHTML = `<div class="lbl">${esc(mt.label.replace(' (%)', ''))} · ${esc(s.id)}, all slices</div><div class="val">${fmt(p, mt.digits)}${unit}<small>prediction</small></div><div class="base">Median baseline ${fmt(m, mt.digits)}${unit} <span class="pill ${vd.cls}">${vd.text}</span></div>`;
+    el.appendChild(d);
+  });
+}
+
+/* overlays in 128x128 image space */
+function pt(y, x){ return [x + 0.5, y + 0.5]; }
+function poly(points, cls, stroke, dash){ const d = points.map((p, i) => (i ? 'L' : 'M') + (p[1] + 0.5).toFixed(2) + ' ' + (p[0] + 0.5).toFixed(2)).join(' ') + ' Z'; return `<path d="${d}" fill="none" stroke="${stroke}" stroke-width="${cls === 'thin' ? 1 : 1.6}" ${dash ? 'stroke-dasharray="3 3"' : ''} opacity="${cls === 'thin' ? .55 : .95}"/>`; }
+function circle(y, x, color, r = 2.4){ const [cx, cy] = pt(y, x); return `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#000" stroke-width="3.6" opacity=".55"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${color}" stroke-width="2.2"/>`; }
+function cross(y, x, color, r = 2.0){ const [cx, cy] = pt(y, x); const l = `<line x1="${cx - r}" y1="${cy - r}" x2="${cx + r}" y2="${cy + r}"/><line x1="${cx - r}" y1="${cy + r}" x2="${cx + r}" y2="${cy - r}"/>`; return `<g stroke="#000" stroke-width="3.6" opacity=".55">${l}</g><g stroke="${color}" stroke-width="2.2">${l}</g>`; }
+function diamond(y, x, color, r = 2.2){ const [cx, cy] = pt(y, x); const d = `M${cx} ${cy - r} L${cx + r} ${cy} L${cx} ${cy + r} L${cx - r} ${cy} Z`; return `<path d="${d}" fill="none" stroke="#000" stroke-width="3.6" opacity=".55"/><path d="${d}" fill="none" stroke="${color}" stroke-width="2.2"/>`; }
+function link(y1, x1, y2, x2, color){ const [a, b] = pt(y1, x1), [c, d] = pt(y2, x2); return `<line x1="${a}" y1="${b}" x2="${c}" y2="${d}" stroke="#000" stroke-width="3" opacity=".5"/><line x1="${a}" y1="${b}" x2="${c}" y2="${d}" stroke="${color}" stroke-width="1.6"/>`; }
+
+function overlaySVG(sl, who){
+  const geo = DATA.slices[state.slice]; const parts = []; const cs = getComputedStyle(document.documentElement);
+  const GT = cs.getPropertyValue('--gt').trim() || '#7CFC00', CMP = cs.getPropertyValue('--cmp').trim() || '#ff3b6b';
+  const REG = ['#fff', '#f2c244', '#5dade2', '#e87ba4', '#ffffff', '#9aa6b4'];
+  if (state.ovReg) Object.entries(geo.regions).forEach(([r, polys]) => polys.forEach(p => parts.push(poly(p, 'thin', REG[+r] || '#fff', true))));
+  const cmpWho = who === 'diff' ? state.diff : who;
+  if (state.ovClu){
+    const c = sl.cluster;
+    if (who === 'gt') c.gt.forEach(k => k.contour.forEach(p => parts.push(poly(p, 'main', GT))));
+    else { c.gt.forEach(k => k.contour.forEach(p => parts.push(poly(p, 'thin', GT, true)))); c[cmpWho].forEach(k => k.contour.forEach(p => parts.push(poly(p, 'main', CMP)))); c['pairs_' + cmpWho].forEach(([oi, gi]) => { const o = c[cmpWho][oi], g = c.gt[gi]; parts.push(link(g.y, g.x, o.y, o.x, '#fff')); }); }
+  }
+  if (state.ovHot) sl.hotspot.regions.forEach(reg => {
+    if (who === 'gt'){ reg.gt.forEach(p => parts.push(circle(p.y, p.x, GT))); return; }
+    reg['pairs_' + cmpWho].forEach(([oi, gi]) => { const o = reg[cmpWho][oi], g = reg.gt[gi]; parts.push(link(g.y, g.x, o.y, o.x, '#fff')); });
+    reg.gt.forEach(p => parts.push(circle(p.y, p.x, GT)));
+    reg[cmpWho].forEach(p => parts.push(cmpWho === 'pred' ? cross(p.y, p.x, CMP) : diamond(p.y, p.x, CMP)));
+  });
+  return `<svg viewBox="0 0 128 128" aria-hidden="true">${parts.join('')}</svg>`;
+}
+
+function renderImages(){
+  const s = DATA.subjects[state.subj]; const sl = s.slices[state.slice]; const ss = sl.ssim; const dw = state.diff;
+  $('img-title').textContent = `${s.id} · slice ${state.slice}` + (s.suvr ? ` · SUVr ${fmt(s.suvr, 2)}` : '');
+  $('img-meta').textContent = `Shared scale 0–${fmt(s.vmax, 0)} · difference scale ±${fmt(s.dmax, 0)}`;
+  $('ramp-max').textContent = fmt(s.vmax, 0);
+  const panels = [
+    { who: 'gt', title: 'Ground truth PET', sw: null, img: sl.img.gt, cap: `GT peaks ${sl.hotspot.regions.reduce((a, r) => a + r.gt.length, 0)} · GT clusters ${sl.cluster.gt.length}` },
+    { who: 'pred', title: 'ERP prediction', sw: 'var(--s1)', img: sl.img.pred, cap: `cSSIM ${fmt(ss.cSSIM_pred)} · Dice ${fmt(sl.dice.pred)} · TRE ${fmt(sl.hotspot.pred.tre, 1)} px · clusters matched ${sl.cluster.summary.pred.matched}/${sl.cluster.summary.pred.n_gt}` },
+    { who: 'med', title: 'Median baseline', sw: 'var(--s2)', img: sl.img.med, cap: `cSSIM ${fmt(ss.cSSIM_med)} · Dice ${fmt(sl.dice.med)} · TRE ${fmt(sl.hotspot.med.tre, 1)} px · clusters matched ${sl.cluster.summary.med.matched}/${sl.cluster.summary.med.n_gt}` },
+    { who: 'diff', title: dw === 'pred' ? 'Prediction − GT' : 'Median − GT', sw: dw === 'pred' ? 'var(--s1)' : 'var(--s2)', img: sl.img['diff_' + dw], cap: `MAE ${fmt(sl.mae[dw], 0)} · red = over-predicted, blue = under-predicted` },
+  ];
+  $('imgs').innerHTML = panels.map(p => `<figure class="fig"><div class="title">${p.sw ? `<span class="sw" style="background:${p.sw}"></span>` : ''}${esc(p.title)}</div><div class="stage"><img src="${p.img}" alt="${esc(p.title)}, ${esc(s.id)} slice ${state.slice}">${overlaySVG(sl, p.who)}</div><figcaption class="cap">${esc(p.cap)}</figcaption></figure>`).join('');
+  const keys = [];
+  if (state.ovHot) keys.push(`<span class="k"><svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5" fill="none" stroke="var(--gt)" stroke-width="2.5"/></svg>GT peak</span>`, `<span class="k"><svg viewBox="0 0 16 16"><path d="M3 3L13 13M3 13L13 3" stroke="var(--cmp)" stroke-width="2.5"/></svg>Predicted peak</span>`, `<span class="k"><svg viewBox="0 0 16 16"><path d="M8 2L14 8L8 14L2 8Z" fill="none" stroke="var(--cmp)" stroke-width="2.5"/></svg>Median peak</span>`, `<span class="k"><svg viewBox="0 0 16 16"><path d="M2 8H14" stroke="var(--ink)" stroke-width="2"/></svg>1-to-1 match</span>`);
+  if (state.ovClu) keys.push(`<span class="k"><svg viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" rx="4" fill="none" stroke="var(--gt)" stroke-width="2"/></svg>GT cluster</span>`, `<span class="k"><svg viewBox="0 0 16 16"><rect x="2" y="2" width="12" height="12" rx="4" fill="none" stroke="var(--cmp)" stroke-width="2"/></svg>Compared cluster</span>`);
+  if (state.ovReg) keys.push(`<span class="k"><svg viewBox="0 0 16 16"><path d="M2 8H14" stroke="var(--accent)" stroke-width="2" stroke-dasharray="3 2"/></svg>Region outlines R1–R5</span>`);
+  $('legend-ov').innerHTML = keys.join('') || '<span>No overlays selected.</span>';
+}
+
+function winCell(v, other, higher, d, unit = ''){ const w = v != null && other != null && (higher ? v > other + 1e-9 : v < other - 1e-9); return `<td class="${w ? 'win' : ''}">${fmt(v, d)}${v == null ? '' : unit}</td>`; }
+function renderDetail(){
+  const s = DATA.subjects[state.subj]; const sl = s.slices[state.slice];
+  const rows = sl.hotspot.regions.map(r => { const hp = r.pairs_pred.filter(p => p[2] <= 10).length, hm = r.pairs_med.filter(p => p[2] <= 10).length; return `<tr><td>${esc(r.name)}</td><td>${r.k}</td><td>${r.gt.length}</td>${winCell(r.tre_pred, r.tre_med, false, 1)}${winCell(r.tre_med, r.tre_pred, false, 1)}<td>${hp}/${r.gt.length}</td><td>${hm}/${r.gt.length}</td></tr>`; }).join('');
+  const hp = sl.hotspot.pred, hm = sl.hotspot.med;
+  $('hot-table').innerHTML = `<table><thead><tr><th>Region</th><th>K</th><th>GT peaks</th><th><span class="dot" style="background:var(--s1)"></span>TRE pred</th><th><span class="dot" style="background:var(--s2)"></span>TRE median</th><th>Hits ≤10 px (pred)</th><th>Hits ≤10 px (med)</th></tr></thead><tbody>${rows}<tr><td><strong>All regions</strong></td><td></td><td>${hp.n_gt_peaks}</td>${winCell(hp.tre, hm.tre, false, 1)}${winCell(hm.tre, hp.tre, false, 1)}<td>${fmt(hp.hdr10, 0)}%</td><td>${fmt(hm.hdr10, 0)}%</td></tr></tbody></table>`;
+  const c = sl.cluster.summary;
+  $('clu-meta').textContent = `threshold ${fmt(DATA.meta.threshold, 0)} · ${sl.cluster.gt.length} GT clusters`;
+  const line = (label, kp, km, higher, d, unit = '') => `<tr><td>${label}</td>${winCell(kp, km, higher, d, unit)}${winCell(km, kp, higher, d, unit)}</tr>`;
+  $('clu-table').innerHTML = `<table><thead><tr><th>Measure</th><th><span class="dot" style="background:var(--s1)"></span>Prediction</th><th><span class="dot" style="background:var(--s2)"></span>Median</th></tr></thead><tbody><tr><td>Clusters found</td><td>${c.pred.n_pred}</td><td>${c.med.n_pred}</td></tr><tr><td>Matched to GT (of ${c.pred.n_gt})</td><td>${c.pred.matched}</td><td>${c.med.matched}</td></tr>${line('Match rate', c.pred.match_rate, c.med.match_rate, true, 0, '%')}${line('False positive rate', c.pred.fpr, c.med.fpr, false, 0, '%')}${line('Mean centroid distance (px)', c.pred.mean_dist, c.med.mean_dist, false, 1)}${line('Mean IoU of matched pairs', c.pred.mean_iou, c.med.mean_iou, true, 3)}</tbody></table>`;
+}
+
+function renderChart(){
+  const mt = METRICS.find(x => x.key === state.metric); $('metric-note').textContent = mt.note;
+  const groups = DATA.subjects.map(s => ({ label: s.id, vals: mt.vol(s.volume) }));
+  const ct = DATA.cohort.test[mt.cohort]; if (ct) groups.push({ label: `Test mean (n=${DATA.cohort.test.n})`, vals: [ct.pred, ct.med] });
+  const cr = DATA.cohort.train && DATA.cohort.train[mt.cohort]; if (cr) groups.push({ label: `Train mean (n=${DATA.cohort.train.n})`, vals: [cr.pred, cr.med] });
+  const host = $('chart'); const W = Math.max(320, host.clientWidth || 800); const H = 260; const m = { t: 16, r: 12, b: 44, l: 48 }; const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const all = groups.flatMap(g => g.vals).filter(v => v != null);
+  let lo = Math.min(0, ...all), hi = Math.max(...all, 0); if (hi === lo) hi = lo + 1; const pad = (hi - lo) * 0.08; hi += pad; if (lo < 0) lo -= pad;
+  const ticks = niceTicks(lo, hi, 5); lo = Math.min(lo, ticks[0]); hi = Math.max(hi, ticks[ticks.length - 1]);
+  const y = v => m.t + ih - (v - lo) / (hi - lo) * ih; const bw = Math.min(24, iw / groups.length / 2 - 6); const gap = 2;
+  let svg = `<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(mt.label)} per subject, prediction vs median baseline">`;
+  ticks.forEach(t => { svg += `<line class="grid" x1="${m.l}" x2="${W - m.r}" y1="${y(t)}" y2="${y(t)}"/><text x="${m.l - 6}" y="${y(t) + 4}" text-anchor="end">${fmtTick(t, mt.digits)}</text>`; });
+  svg += `<line class="axis" x1="${m.l}" x2="${W - m.r}" y1="${y(0)}" y2="${y(0)}"/>`;
+  groups.forEach((g, i) => {
+    const cx = m.l + (i + 0.5) * iw / groups.length;
+    [0, 1].forEach(k => {
+      const v = g.vals[k]; if (v == null) return; const x = cx - bw - gap / 2 + k * (bw + gap); const y0 = y(0), y1 = y(v); const top = Math.min(y0, y1), h = Math.max(1, Math.abs(y0 - y1)); const r = Math.min(4, h);
+      const col = k ? 'var(--s2)' : 'var(--s1)'; const name = k ? 'Median baseline' : 'ERP prediction';
+      const path = v >= 0 ? `M${x} ${y0} V${top + r} Q${x} ${top} ${x + r} ${top} H${x + bw - r} Q${x + bw} ${top} ${x + bw} ${top + r} V${y0} Z` : `M${x} ${y0} V${y0 + h - r} Q${x} ${y0 + h} ${x + r} ${y0 + h} H${x + bw - r} Q${x + bw} ${y0 + h} ${x + bw} ${y0 + h - r} V${y0} Z`;
+      svg += `<path class="bar" d="${path}" fill="${col}" data-tip="${esc(g.label)} · ${name}: ${fmt(v, mt.digits)}" tabindex="0"><title>${esc(g.label)} · ${name}: ${fmt(v, mt.digits)}</title></path>`;
+    });
+    const vals = g.vals.filter(v => v != null); if (vals.length){ const best = mt.higher ? Math.max(...vals) : Math.min(...vals); const k = g.vals.indexOf(best); const x = cx - bw - gap / 2 + k * (bw + gap) + bw / 2; svg += `<text class="lab" x="${x}" y="${y(Math.max(best, 0)) - 5}" text-anchor="middle">${fmt(best, mt.digits)}</text>`; }
+    svg += `<text x="${cx}" y="${H - m.b + 16}" text-anchor="middle">${esc(g.label)}</text>`;
+  });
+  svg += '</svg>';
+  const tip = $('tip'); host.innerHTML = svg; host.appendChild(tip);
+  host.querySelectorAll('.bar').forEach(b => {
+    const show = () => { tip.textContent = b.dataset.tip; tip.hidden = false; const r = host.getBoundingClientRect(); const bb = b.getBoundingClientRect(); tip.style.left = (bb.left + bb.width / 2 - r.left) + 'px'; tip.style.top = (bb.top - r.top) + 'px'; host.querySelectorAll('.bar').forEach(o => o.style.opacity = o === b ? 1 : .55); };
+    const hide = () => { tip.hidden = true; host.querySelectorAll('.bar').forEach(o => o.style.opacity = 1); };
+    b.addEventListener('mouseenter', show); b.addEventListener('focus', show); b.addEventListener('mouseleave', hide); b.addEventListener('blur', hide);
+  });
+}
+function niceTicks(lo, hi, n){ const raw = (hi - lo) / n; const p = Math.pow(10, Math.floor(Math.log10(raw))); const step = [1, 2, 2.5, 5, 10].map(s => s * p).find(s => s >= raw) || p * 10; const t0 = Math.floor(lo / step) * step; const out = []; for (let t = t0; t <= hi + step / 2; t += step) out.push(+t.toFixed(10)); return out; }
+function fmtTick(t, d){ return Math.abs(t) >= 1000 ? t.toLocaleString() : (+t).toFixed(Math.min(d, 3)); }
+
+function renderFullTable(){
+  const subs = DATA.subjects; const ct = DATA.cohort.test, cr = DATA.cohort.train || {};
+  const head = `<tr><th>Measure</th>` + subs.map(s => `<th><span class="dot" style="background:var(--s1)"></span>${esc(s.id)}</th><th><span class="dot" style="background:var(--s2)"></span>median</th>`).join('') + `<th>Test mean pred</th><th>Test mean median</th>` + (cr.n ? `<th>Train mean pred</th><th>Train mean median</th>` : '') + `</tr>`;
+  let grp = null, body = '';
+  METRICS.forEach(mt => {
+    if (mt.group !== grp){ grp = mt.group; body += `<tr class="grp"><td colspan="${1 + subs.length * 2 + 2 + (cr.n ? 2 : 0)}">${grp}</td></tr>`; }
+    body += `<tr><td>${esc(mt.label)}</td>`;
+    subs.forEach(s => { const [p, m] = mt.vol(s.volume); body += winCell(p, m, mt.higher, mt.digits) + winCell(m, p, mt.higher, mt.digits); });
+    const t = ct[mt.cohort] || {}; body += winCell(t.pred, t.med, mt.higher, mt.digits) + winCell(t.med, t.pred, mt.higher, mt.digits);
+    if (cr.n){ const r = cr[mt.cohort] || {}; body += winCell(r.pred, r.med, mt.higher, mt.digits) + winCell(r.med, r.pred, mt.higher, mt.digits); }
+    body += '</tr>';
+  });
+  $('full-table').innerHTML = `<table><thead>${head}</thead><tbody>${body}</tbody></table><p class="note" style="margin-top:8px">Bold marks the better of prediction vs median baseline. Train means come from the ${cr.n || 0} training subjects and show how much the model fits data it has seen.</p>`;
+}
+init();
+</script>
